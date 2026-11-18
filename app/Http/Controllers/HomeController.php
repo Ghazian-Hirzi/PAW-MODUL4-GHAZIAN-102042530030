@@ -12,26 +12,63 @@ class HomeController extends Controller
      */
     public function index(Request $request)
     {
-        // TODO 3: Lengkapi logika index():
-        // 1. Buat query pencarian berdasarkan judul, penulis, atau penerbit jika ada input 'search'
-        // 2. Tambahkan filter penerbit dan filter ketersediaan stok jika ada input 'penerbit' / 'status'
-        // 3. Tambahkan pengurutan data berdasarkan input 'sort' (judul, tahun, stok, default: latest)
-        // 4. Lakukan paginasi 8 data dengan withQueryString()
-        // 5. Ambil list penerbit unik untuk opsi dropdown filter
-        // 6. Return view 'home' dengan data buku dan list penerbit
+        $query = Buku::query();
 
-        $buku = Buku::paginate(8);
-        $listPenerbit = collect();
-
-        return view('home', compact('buku', 'listPenerbit'));
+     // Pencarian judul atau penulis
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+            $q->where('judul', 'like', "%{$search}%")
+              ->orWhere('penulis', 'like', "%{$search}%");
+        });
     }
 
-    /**
-     * Menampilkan halaman detail informasi sebuah buku untuk publik/mahasiswa.
-     */
-    public function show(Buku $buku)
+     // Filter penerbit
+        if ($request->filled('penerbit')) {
+            $query->where('penerbit', $request->penerbit);
+    }
+
+     // Filter ketersediaan stok
+        if ($request->status === 'tersedia') {
+            $query->where('stok', '>', 0);
+        } elseif ($request->status === 'habis') {
+            $query->where('stok', '<=', 0);
+    }
+
+     // Pengurutan
+        switch ($request->sort) {
+         case 'judul_asc':
+            $query->orderBy('judul', 'asc');
+            break;
+            case 'judul_desc':
+            $query->orderBy('judul', 'desc');
+            break;
+         case 'tahun_desc':
+            $query->orderBy('tahun_terbit', 'desc');
+            break;
+         case 'tahun_asc':
+            $query->orderBy('tahun_terbit', 'asc');
+            break;
+         case 'stok_desc':
+            $query->orderBy('stok', 'desc');
+            break;
+         default:
+            $query->latest('id'); // Terbaru
+    }
+
+    // Paginasi 5 data, parameter URL dipertahankan
+    $buku = $query->paginate(5)->withQueryString();
+
+    // Daftar penerbit untuk dropdown filter
+    $listPenerbit = Buku::select('penerbit')->distinct()->orderBy('penerbit')->pluck('penerbit');
+
+    return view('home', compact('buku', 'listPenerbit'));
+    }
+    
+    public function show($id)
     {
-        // TODO 3: Kembalikan view 'home_show' membawa data $buku
+        $buku = Buku::findOrFail($id);
+
         return view('home_show', compact('buku'));
-    }
+    }   
 }
